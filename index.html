@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>学习管家</title>
+<style>
+:root{--bg:#f3f6fb;--card:#fff;--ink:#16243d;--mut:#6b7a93;--ln:#e3e9f3;--ac:#2f6bff;--ok:#1e9e6a;--wr:#e5484d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1624;--card:#18223a;--ink:#e8eefb;--mut:#8d9bb8;--ln:#27324d;--ac:#6c95ff;--ok:#3ccf91;--wr:#ff6b70}}
+:root[data-theme="dark"]{--bg:#0f1624;--card:#18223a;--ink:#e8eefb;--mut:#8d9bb8;--ln:#27324d;--ac:#6c95ff;--ok:#3ccf91;--wr:#ff6b70}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px 16px 100px}
+h1{font-size:26px;margin:4px 0}h2{font-size:17px;margin:20px 0 8px}
+.mut,small{color:var(--mut);font-size:13px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:12px 14px;margin-bottom:8px}
+.row{display:flex;align-items:center;gap:10px}.sp{flex:1;min-width:0}
+.btn{border:0;border-radius:10px;background:var(--ac);color:#fff;font:inherit;font-size:15px;padding:9px 16px;cursor:pointer}
+.btn.g{background:transparent;color:var(--mut);border:1px solid var(--ln)}.btn.r{background:transparent;color:var(--wr);border:1px solid var(--ln)}.btn.s{padding:5px 10px;font-size:13px}
+.tag{font-size:12px;padding:1px 8px;border-radius:99px;background:color-mix(in srgb,var(--ac) 14%,transparent);color:var(--ac)}
+.ck{width:26px;height:26px;border-radius:50%;border:2px solid var(--ln);background:none;color:#fff;flex:none;cursor:pointer;font-size:14px;padding:0}
+.done .ck{background:var(--ok);border-color:var(--ok)}.done .t{text-decoration:line-through;color:var(--mut)}
+.bar{height:8px;background:var(--ln);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+.chip{flex:1;border:1px solid var(--ln);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 0;font:inherit;font-size:14px;line-height:1.3;cursor:pointer}.chip.cur{background:var(--ac);color:#fff;border-color:var(--ac)}.chip.cur small{color:#fffc}
+.col{flex:1;text-align:center;font-size:11px;color:var(--mut)}.bt{height:90px;background:var(--ln);border-radius:6px;display:flex;align-items:flex-end;overflow:hidden;margin-bottom:4px}.bt i{width:100%;background:var(--ac)}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;border:0;background:none;color:var(--mut);font:inherit;font-size:11px;padding:8px 0 6px;cursor:pointer}nav b{display:block;font-size:20px;font-weight:400}nav .cur{color:var(--ac);font-weight:600}
+#sheet{position:fixed;inset:0;background:#0007;display:flex;align-items:flex-end;justify-content:center;z-index:9}#sheet[hidden],#toast[hidden]{display:none}
+.box{background:var(--card);width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));max-height:88%;overflow:auto}
+label{display:block;font-size:13px;color:var(--mut);margin-bottom:10px}
+input,select,textarea{display:block;width:100%;margin-top:4px;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:9px 10px}
+.m{max-width:90%;padding:8px 12px;border-radius:14px;margin:6px 0;white-space:pre-wrap;word-break:break-word}.m.user{background:var(--ac);color:#fff;margin-left:auto}.m.assistant{background:var(--card);border:1px solid var(--ln)}
+summary{cursor:pointer}details .row{margin-top:8px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;background:#000c;color:#fff;padding:8px 14px;border-radius:99px;font-size:14px;z-index:10}
+</style></head><body>
+<main id="v"></main><nav id="n"></nav><div id="sheet" hidden></div><div id="toast" hidden></div>
+<script>
+const $=s=>document.querySelector(s),K='xgj1',
+SUB=['语文','数学','英语','物理','化学','生物','政治','历史','地理','其他'],
+WHY=['概念不清','计算失误','审题不仔细','方法不会','记忆不牢','粗心'],
+DAYS=['周一','周二','周三','周四','周五','周六','周日'],
+TABS=[['today','📋','今天'],['plan','🗓️','计划'],['wrong','📕','错题'],['ai','💬','助手'],['stats','📊','统计']],
+SYS='你是中国高中生的学习助手。用简体中文简洁回答：讲解知识点要分步骤并举例；分析错题要指出错因、正确思路和同类练习方向；复习建议要具体到可执行的小任务。不确定时直说，不要编造。';
+let S={tasks:[],plan:[],wrong:[]},chat=[],tab='today',wf='',busy=0,tm;
+try{S=Object.assign(S,JSON.parse(localStorage.getItem(K)||'{}'));chat=JSON.parse(localStorage.getItem(K+'c')||'[]')}catch(e){}
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){toast('保存失败：浏览器存储不可用')}},
+saveChat=()=>{try{localStorage.setItem(K+'c',JSON.stringify(chat.slice(-30)))}catch(e){}},
+esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+ds=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),
+today=()=>ds(new Date()),dt0=s=>new Date(s+'T00:00:00'),
+addD=(s,n)=>{const d=dt0(s);d.setDate(d.getDate()+n);return ds(d)},
+wd=s=>(dt0(s).getDay()+6)%7,wk0=s=>addD(s,-wd(s)),
+uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+rate=(n,d)=>n?Math.round(d/n*100):0,
+pdn=p=>!!p.done[wk0(today())];
+let planDay=wd(today());
+function toast(s){const e=$('#toast');e.textContent=s;e.hidden=false;clearTimeout(tm);tm=setTimeout(()=>e.hidden=true,2200)}
+function form(title,fs,ok,btn='保存'){
+ const m=$('#sheet');
+ m.innerHTML=`<div class="box"><h2 style="margin-top:0">${title}</h2>`+fs.map(f=>`<label>${f.l}`+(f.o?`<select name="${f.k}">${f.o.map(o=>`<option${o===f.v?' selected':''}>${o}</option>`).join('')}</select>`:f.a?`<textarea name="${f.k}" rows="3">${esc(f.v)}</textarea>`:`<input name="${f.k}" type="${f.y||'text'}" value="${esc(f.v)}">`)+'</label>').join('')+`<div class="row"><button class="btn g sp" id="x">取消</button><button class="btn sp" id="o">${btn}</button></div></div>`;
+ m.hidden=false;m.onclick=e=>{if(e.target===m)m.hidden=true};
+ $('#x').onclick=()=>m.hidden=true;
+ $('#o').onclick=()=>{const v={};m.querySelectorAll('[name]').forEach(e=>v[e.name]=e.value.trim());if(ok(v)!==false)m.hidden=true};
+}
+const rng=o=>{const s=addD(today(),o),L=S.tasks.filter(x=>x.date===s);return{s,n:L.length,d:L.filter(x=>x.done).length}},
+sum=(a,k)=>a.reduce((s,x)=>s+x[k],0);
+function trow(x){return`<div class="card row ${x.done?'done':''}"><button class="ck" data-a="tg" data-i="${x.id}">${x.done?'✓':''}</button><div class="sp"><div class="t">${esc(x.t)}</div><small><span class="tag">${esc(x.sub)}</span> ${x.min?x.min+'分钟 ':''}${x.date<today()&&!x.done?'<b style="color:var(--wr)">逾期 '+x.date.slice(5)+'</b>':''}</small></div><button class="btn g s" data-a="et" data-i="${x.id}">编辑</button><button class="btn r s" data-a="dt" data-i="${x.id}">删除</button></div>`}
+function prow(p,full){const d=pdn(p);return`<div class="card row ${d?'done':''}"><button class="ck" data-a="pt" data-i="${p.id}">${d?'✓':''}</button><div class="sp"><div class="t">${esc(p.t)}</div><small><span class="tag">${esc(p.sub)}</span> ${full?'':'今日计划'}</small></div>${full?`<button class="btn g s" data-a="ep" data-i="${p.id}">编辑</button><button class="btn r s" data-a="dp" data-i="${p.id}">删除</button>`:''}</div>`}
+function renderToday(){
+ const t=today(),d=new Date(),ts=S.tasks.filter(x=>x.date===t||(x.date<t&&!x.done)),ps=S.plan.filter(p=>p.day===wd(t)),
+ all=ts.length+ps.length,dn=ts.filter(x=>x.done).length+ps.filter(pdn).length,pct=rate(all,dn),due=S.wrong.filter(w=>w.rev&&w.rev<=t).length,
+ todo=[...ts.filter(x=>!x.done).map(trow),...ps.filter(p=>!pdn(p)).map(p=>prow(p))],fin=[...ts.filter(x=>x.done).map(trow),...ps.filter(pdn).map(p=>prow(p))];
+ $('#v').innerHTML=`<div class="row"><div class="sp"><h1>${d.getMonth()+1}月${d.getDate()}日</h1><div class="mut">星期${'日一二三四五六'[d.getDay()]} · 已完成 ${dn}/${all} 项</div></div><svg width="84" height="84" viewBox="0 0 84 84"><circle cx="42" cy="42" r="34" fill="none" stroke="var(--ln)" stroke-width="9"/><circle cx="42" cy="42" r="34" fill="none" stroke="var(--ac)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${pct*2.136} 214" transform="rotate(-90 42 42)"/><text x="42" y="48" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">${pct}%</text></svg></div>`+
+ (due?`<div class="card row" data-a="go" data-i="wrong" style="cursor:pointer;margin-top:12px"><span class="sp">📕 有 ${due} 道错题到了复习日期</span><span class="mut">去复习</span></div>`:'')+
+ `<div class="row"><h2 class="sp">待完成</h2><button class="btn s" data-a="et" data-i="">+ 添加任务</button></div>`+(todo.join('')||`<div class="card mut">${all?'今天的任务都完成了，真棒！':'今天还没有任务，点「添加任务」开始吧。'}</div>`)+(fin.length?`<h2>已完成</h2>`+fin.join(''):'');
+}
+function renderPlan(){
+ const wk=S.plan.length,dn=S.plan.filter(pdn).length,pct=rate(wk,dn),L=S.plan.filter(p=>p.day===planDay);
+ $('#v').innerHTML=`<h1>学习计划</h1><div class="card"><div class="row"><span class="sp">本周进度</span><b>${dn}/${wk} · ${pct}%</b></div><div class="bar" style="margin-top:8px"><i style="width:${pct}%"></i></div><small>计划每周重复，勾选只记录本周，下周自动重置。</small></div><div class="row" style="gap:5px">`+DAYS.map((n,i)=>{const l=S.plan.filter(p=>p.day===i);return`<button class="chip ${i===planDay?'cur':''}" data-a="day" data-i="${i}">${n}<br><small>${l.filter(pdn).length}/${l.length}</small></button>`}).join('')+`</div><div class="row"><h2 class="sp">${DAYS[planDay]}安排</h2><button class="btn s" data-a="ep" data-i="">+ 添加</button></div>`+(L.map(p=>prow(p,1)).join('')||'<div class="card mut">这一天还没有安排，添加课程或复习任务吧。</div>');
+}
+function renderWrong(){
+ const t=today(),L=S.wrong.filter(w=>!wf||w.sub===wf).sort((a,b)=>(a.rev||'9').localeCompare(b.rev||'9'));
+ $('#v').innerHTML=`<div class="row"><h1 class="sp">错题本</h1><button class="btn" data-a="ew" data-i="">+ 记错题</button></div><select id="wf" style="margin:8px 0 12px"><option value="">全部学科</option>${SUB.map(s=>`<option${s===wf?' selected':''}>${s}</option>`).join('')}</select>`+
+ (L.map(w=>`<details class="card"><summary><span class="tag">${esc(w.sub)}</span> <span class="tag">${esc(w.why)}</span> ${w.rev&&w.rev<=t?'<b style="color:var(--wr)">待复习</b>':''}<div style="margin-top:4px">${esc(w.q.slice(0,60))}${w.q.length>60?'…':''}</div></summary><p class="mut" style="margin-bottom:0">题目</p><div style="white-space:pre-wrap">${esc(w.q)}</div><p class="mut" style="margin-bottom:0">正确思路</p><div style="white-space:pre-wrap">${esc(w.ans)||'（未填写）'}</div><small>下次复习：${w.rev||'未设置'} · 已复习 ${w.n||0} 次</small><div class="row"><button class="btn s" data-a="rv" data-i="${w.id}">已复习</button><button class="btn g s" data-a="an" data-i="${w.id}">AI 分析</button><button class="btn g s" data-a="ew" data-i="${w.id}">编辑</button><button class="btn r s" data-a="dw" data-i="${w.id}">删除</button></div></details>`).join('')||'<div class="card mut">还没有错题。做错的题记在这里，到期会提醒你复习。</div>');
+}
+function renderAI(){
+ $('#v').innerHTML=`<h1>AI 学习助手</h1><div class="row" style="flex-wrap:wrap;margin:8px 0"><button class="btn g s" data-a="chip" data-i="k">讲解知识点</button><button class="btn g s" data-a="chip" data-i="w">分析错题</button><button class="btn g s" data-a="chip" data-i="r">复习建议</button><button class="btn g s" data-a="clr">清空对话</button></div><div id="cl"></div><div class="card row"><textarea id="q" rows="2" style="margin:0" placeholder="输入问题，Enter 发送"></textarea><button class="btn" data-a="send">发送</button></div>`;drawChat();
+}
+function drawChat(){const e=$('#cl');if(!e)return;e.innerHTML=chat.length?chat.map(m=>`<div class="m ${m.role}">${esc(m.content)}</div>`).join(''):'<div class="mut">可以问我：知识点讲解、错题分析、复习安排。</div>';scrollTo(0,document.body.scrollHeight)}
+function ctx(){
+ const t=today(),r=[...Array(7)].map((_,i)=>rng(i-6)),by={},due=S.wrong.filter(w=>w.rev&&w.rev<=t),why={};
+ S.tasks.filter(x=>x.done).forEach(x=>by[x.sub]=(by[x.sub]||0)+(x.min||0));S.wrong.forEach(w=>why[w.why]=(why[w.why]||0)+1);
+ return`我近7天任务完成 ${sum(r,'d')}/${sum(r,'n')}；已完成任务各学科累计分钟：${JSON.stringify(by)}；待复习错题 ${due.length} 道（学科：${[...new Set(due.map(w=>w.sub))].join('、')||'无'}）；错题错因统计：${JSON.stringify(why)}。`}
+async function ask(text){
+ if(busy)return;busy=1;chat.push({role:'user',content:text});const a={role:'assistant',content:'思考中…'};chat.push(a);if(tab!=='ai'){tab='ai';render()}drawChat();
+ try{const sm=window.claude?await claude.use('sample'):null;
+  if(!sm)a.content='网站版暂未接入 AI（需要模型 API 密钥和后端服务），其他功能不受影响。';
+  else{const h=chat.slice(0,-1).slice(-8).map(m=>({role:m.role,content:m.content}));while(h[0].role!=='user')h.shift();h[0].content=SYS+'\n\n'+h[0].content;
+   const r=await sm(h,{cache:false,onText:t=>{a.content=t.text;drawChat()}});a.content=r.text}
+ }catch(e){a.content=e&&e.code==='not_granted'?'你没有授权 AI 功能，可再次发送并选择允许。':'AI 暂时无法回答，请稍后重试。'}
+ busy=0;saveChat();drawChat();
+}
+function renderStats(){
+ const days=[...Array(7)].map((_,i)=>rng(i-6)),prev=[...Array(7)].map((_,i)=>rng(i-13)),
+ r1=rate(sum(days,'n'),sum(days,'d')),r0=rate(sum(prev,'n'),sum(prev,'d')),has=sum(prev,'n')&&sum(days,'n'),
+ rows=SUB.map(s=>{const L=S.tasks.filter(x=>x.sub===s&&x.done);return{s,c:L.length,m:L.reduce((a,x)=>a+(x.min||0),0),w:S.wrong.filter(x=>x.sub===s).length}}).filter(r=>r.c||r.w);
+ $('#v').innerHTML=`<h1>学习统计</h1><div class="row" style="gap:8px"><div class="card sp"><small>近7天完成率</small><div style="font-size:26px;font-weight:700">${r1}%</div></div><div class="card sp"><small>较前7天</small><div style="font-size:26px;font-weight:700;color:${r1-r0>=0?'var(--ok)':'var(--wr)'}">${has?(r1-r0>=0?'+':'')+(r1-r0)+'%':'—'}</div></div><div class="card sp"><small>累计完成</small><div style="font-size:26px;font-weight:700">${S.tasks.filter(x=>x.done).length}</div></div></div><h2>近7天每日完成率</h2><div class="card row" style="align-items:flex-end;gap:6px">`+days.map(d=>`<div class="col"><div class="bt"><i style="height:${rate(d.n,d.d)}%"></i></div>${'日一二三四五六'[dt0(d.s).getDay()]}<br>${d.d}/${d.n}</div>`).join('')+`</div><h2>各学科记录</h2>`+(rows.map(r=>`<div class="card row"><span class="tag">${r.s}</span><span class="sp">完成 ${r.c} 项 · ${r.m} 分钟</span><small>错题 ${r.w}</small></div>`).join('')||'<div class="card mut">完成任务或记录错题后，这里会出现各学科的统计。</div>')+`<div class="card mut">错题已复习 ${S.wrong.filter(w=>w.n).length}/${S.wrong.length} 道。数据保存在本设备浏览器中，清除网站数据会丢失。</div>`;
+}
+function editTask(i){const x=S.tasks.find(a=>a.id===i)||{};
+ form(x.id?'编辑任务':'添加任务',[{k:'t',l:'任务内容',v:x.t},{k:'sub',l:'学科',o:SUB,v:x.sub||'数学'},{k:'date',l:'日期',y:'date',v:x.date||today()},{k:'min',l:'预计分钟',y:'number',v:x.min??30}],v=>{
+  if(!v.t)return toast('请填写任务内容'),false;
+  const o={t:v.t,sub:v.sub,date:v.date||today(),min:+v.min||0};
+  x.id?Object.assign(x,o):S.tasks.push({id:uid(),done:false,...o});save();render()})}
+function editPlan(i){const x=S.plan.find(a=>a.id===i)||{};
+ form(x.id?'编辑安排':'添加安排',[{k:'t',l:'课程或复习任务',v:x.t},{k:'sub',l:'学科',o:SUB,v:x.sub||'数学'},{k:'day',l:'星期',o:DAYS,v:DAYS[x.id?x.day:planDay]}],v=>{
+  if(!v.t)return toast('请填写内容'),false;
+  const o={t:v.t,sub:v.sub,day:DAYS.indexOf(v.day)};
+  x.id?Object.assign(x,o):S.plan.push({id:uid(),done:{},...o});planDay=o.day;save();render()})}
+function editWrong(i){const x=S.wrong.find(a=>a.id===i)||{};
+ form(x.id?'编辑错题':'记错题',[{k:'sub',l:'学科',o:SUB,v:x.sub||'数学'},{k:'q',l:'题目',a:1,v:x.q},{k:'ans',l:'正确思路',a:1,v:x.ans},{k:'why',l:'错误原因',o:WHY,v:x.why},{k:'rev',l:'复习日期',y:'date',v:x.rev||addD(today(),1)}],v=>{
+  if(!v.q)return toast('请填写题目'),false;
+  x.id?Object.assign(x,v):S.wrong.push({id:uid(),n:0,...v});save();render()})}
+const del=(k,i,msg)=>form(msg,[],()=>{S[k]=S[k].filter(a=>a.id!==i);save();render()},'删除'),
+A={
+ go:i=>{tab=i;render();scrollTo(0,0)},
+ tg:i=>{const x=S.tasks.find(a=>a.id===i);x.done=!x.done;save();render()},
+ pt:i=>{const p=S.plan.find(a=>a.id===i),w=wk0(today());p.done[w]=!p.done[w];save();render()},
+ et:editTask,ep:editPlan,ew:editWrong,
+ dt:i=>del('tasks',i,'删除这个任务？'),dp:i=>del('plan',i,'删除这条安排？'),dw:i=>del('wrong',i,'删除这道错题？'),
+ rv:i=>{const w=S.wrong.find(a=>a.id===i);w.n=(w.n||0)+1;w.rev=addD(today(),[1,3,7,14,30][Math.min(w.n,4)]);save();render();toast('已复习，下次复习：'+w.rev.slice(5))},
+ an:i=>{const w=S.wrong.find(a=>a.id===i);ask(`请分析这道错题。\n学科：${w.sub}\n题目：${w.q}\n正确思路：${w.ans||'（未填写）'}\n我认为的错因：${w.why}\n请指出可能的深层原因，给出完整解法，并说明可做哪类同类练习。`)},
+ day:i=>{planDay=+i;render()},
+ chip:i=>{if(i==='r')return ask('请根据我的学习数据给出本周复习建议。\n'+ctx());const q=$('#q');q.value=i==='k'?'请讲解这个知识点，并举一个例子：':'请分析这道错题：\n题目：\n我的答案和疑惑：';q.focus()},
+ clr:()=>{chat=[];saveChat();drawChat()},
+ send:()=>{const q=$('#q'),v=q.value.trim();if(v){q.value='';ask(v)}}
+};
+function render(){
+ $('#n').innerHTML=TABS.map(t=>`<button class="${t[0]===tab?'cur':''}" data-a="go" data-i="${t[0]}"><b>${t[1]}</b>${t[2]}</button>`).join('');
+ ({today:renderToday,plan:renderPlan,wrong:renderWrong,ai:renderAI,stats:renderStats})[tab]();
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&A[b.dataset.a])A[b.dataset.a](b.dataset.i)});
+document.addEventListener('change',e=>{if(e.target.id==='wf'){wf=e.target.value;renderWrong()}});
+document.addEventListener('keydown',e=>{if(e.target.id==='q'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();A.send()}});
+render();
+</script></body></html>
